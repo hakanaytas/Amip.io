@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e17">
+<title>Mikrop Arena — Hücre Savaşları</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================
+   DESIGN TOKENS
+   Palette: abyssal navy field, bioluminescent teal / magenta accents
+   Display face: Rajdhani (angular, technical, reads like a HUD)
+   Body face: Inter (clean, legible at small sizes for UI)
+===================================================== */
+:root{
+  --bg-void:#070a12;
+  --bg-panel:#0e1424;
+  --bg-panel-2:#141c33;
+  --line:#232d4a;
+  --teal:#43ecc4;
+  --teal-dim:#1f7d68;
+  --magenta:#ff4f81;
+  --gold:#ffc857;
+  --purple:#c874ff;
+  --text-hi:#eef2fb;
+  --text-lo:#8a93b3;
+  --danger:#ff5d5d;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{
+  margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+  background:var(--bg-void); color:var(--text-hi);
+  font-family:'Inter',sans-serif;
+  overscroll-behavior:none; touch-action:none;
+  position:fixed; inset:0;
+}
+#gameCanvas{
+  position:fixed; inset:0; width:100%; height:100%; display:block;
+  background:var(--bg-void); touch-action:none;
+}
+.hidden{display:none !important;}
+
+/* ---------- Overlay shell ---------- */
+.overlay{
+  position:fixed; inset:0; z-index:50;
+  display:flex; align-items:center; justify-content:center;
+  padding: calc(24px + var(--safe-top)) calc(24px + var(--safe-right)) calc(24px + var(--safe-bottom)) calc(24px + var(--safe-left));
+  background:radial-gradient(ellipse at 50% 20%, rgba(20,28,51,.92), rgba(5,7,13,.97));
+  backdrop-filter: blur(6px);
+  overflow-y:auto;
+}
+.panel{
+  width:min(480px, 100%);
+  background:linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel));
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:28px 26px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.03);
+  max-height:calc(100vh - 48px);
+  overflow-y:auto;
+}
+.panel-wide{width:min(640px,100%);}
+h1.title{
+  font-family:'Rajdhani',sans-serif; font-weight:700; letter-spacing:.5px;
+  font-size:clamp(28px,6vw,40px); margin:0 0 4px; text-align:center;
+  color:var(--text-hi);
+  text-shadow:0 0 24px rgba(67,236,196,.35);
+}
+.subtitle{text-align:center; color:var(--teal); font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:2px; text-transform:uppercase; font-size:12px; margin-bottom:22px;}
+h2.panel-title{
+  font-family:'Rajdhani',sans-serif; font-weight:700; font-size:22px; letter-spacing:.5px;
+  margin:0 0 18px; text-align:center; color:var(--text-hi);
+}
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  width:100%; padding:15px 18px; margin:8px 0;
+  border-radius:12px; border:1px solid var(--line);
+  background:var(--bg-panel-2); color:var(--text-hi);
+  font-family:'Rajdhani',sans-serif; font-weight:600; font-size:17px; letter-spacing:.3px;
+  cursor:pointer; transition:transform .08s ease, background .15s ease, border-color .15s ease;
+  min-height:50px; -webkit-user-select:none; user-select:none;
+}
+.btn:hover{border-color:var(--teal-dim); background:#182140;}
+.btn:active{transform:scale(.97);}
+.btn-primary{
+  background:linear-gradient(135deg, var(--teal), #2bb99a); color:#04140f; border:none;
+  box-shadow:0 8px 24px rgba(67,236,196,.25);
+}
+.btn-primary:hover{background:linear-gradient(135deg,#5ff5d3,#34cca9);}
+.btn-danger{color:var(--magenta); border-color:rgba(255,79,129,.35);}
+.btn-danger:hover{background:rgba(255,79,129,.08); border-color:var(--magenta);}
+.btn-row{display:flex; gap:10px;}
+.btn-row .btn{margin:8px 0;}
+.btn-sm{padding:10px 14px; min-height:auto; font-size:14px; width:auto;}
+
+/* ---------- Menu list (main menu) ---------- */
+.menu-grid{display:flex; flex-direction:column; gap:2px;}
+.menu-item{
+  display:flex; align-items:center; gap:14px; width:100%;
+  padding:14px 16px; border-radius:12px; border:1px solid transparent;
+  background:transparent; color:var(--text-hi); cursor:pointer;
+  font-family:'Rajdhani',sans-serif; font-weight:600; font-size:16px;
+  transition:background .15s, border-color .15s, transform .08s;
+}
+.menu-item:hover{background:var(--bg-panel-2); border-color:var(--line); transform:translateX(2px);}
+.menu-item:active{transform:scale(.98);}
+.menu-item .ico{font-size:20px; width:28px; text-align:center;}
+.menu-item.primary{
+  background:linear-gradient(135deg, var(--teal), #2bb99a); color:#04140f;
+  box-shadow:0 8px 24px rgba(67,236,196,.22); margin-bottom:10px;
+}
+.menu-item.primary .ico{filter:none;}
+
+/* ---------- Profile header on main menu ---------- */
+.profile-strip{display:flex; align-items:center; gap:12px; margin-bottom:18px;}
+.avatar-circle{
+  width:56px; height:56px; border-radius:50%; flex-shrink:0; position:relative;
+  border:2px solid var(--teal-dim); background:var(--bg-void) center/cover no-repeat;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  font-family:'Rajdhani',sans-serif; font-weight:700; font-size:22px; color:var(--teal);
+}
+.profile-strip .who{flex:1; min-width:0;}
+.profile-strip .who .pname{font-family:'Rajdhani',sans-serif; font-weight:700; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.profile-strip .who .pstat{font-size:11.5px; color:var(--text-lo);}
+
+/* ---------- Play name input ---------- */
+.name-input{
+  width:100%; padding:14px 16px; margin:6px 0 14px; border-radius:12px;
+  border:1px solid var(--line); background:var(--bg-void); color:var(--text-hi);
+  font-family:'Inter',sans-serif; font-size:16px; text-align:center;
+}
+.name-input:focus{outline:none; border-color:var(--teal);}
+
+/* ---------- Settings rows ---------- */
+.setting-row{
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding:12px 4px; border-bottom:1px solid var(--line);
+}
+.setting-row:last-child{border-bottom:none;}
+.setting-label{font-size:14px; color:var(--text-hi); font-weight:500;}
+.setting-label small{display:block; color:var(--text-lo); font-weight:400; font-size:11px; margin-top:2px;}
+input[type=range]{
+  -webkit-appearance:none; width:130px; height:6px; border-radius:3px;
+  background:var(--line); outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:20px; height:20px; border-radius:50%;
+  background:var(--teal); cursor:pointer; border:2px solid #04140f;
+}
+input[type=range]::-moz-range-thumb{
+  width:20px; height:20px; border-radius:50%; background:var(--teal); border:2px solid #04140f; cursor:pointer;
+}
+.toggle{
+  position:relative; width:50px; height:28px; border-radius:14px; background:var(--line);
+  cursor:pointer; transition:background .2s; flex-shrink:0;
+}
+.toggle.on{background:var(--teal-dim);}
+.toggle::after{
+  content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%;
+  background:var(--text-hi); transition:transform .2s;
+}
+.toggle.on::after{transform:translateX(22px); background:var(--teal);}
+.seg{display:flex; gap:6px; background:var(--bg-void); border-radius:10px; padding:4px; flex-shrink:0;}
+.seg button{
+  flex:1; border:none; background:transparent; color:var(--text-lo); padding:7px 10px; border-radius:7px;
+  font-family:'Rajdhani',sans-serif; font-weight:600; font-size:13px; cursor:pointer; white-space:nowrap;
+}
+.seg button.active{background:var(--teal); color:#04140f;}
+.back-row{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+.back-btn{
+  width:38px; height:38px; border-radius:10px; border:1px solid var(--line); background:var(--bg-panel-2);
+  color:var(--text-hi); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+}
+
+/* ---------- Avatar screen ---------- */
+.avatar-big{
+  width:140px; height:140px; border-radius:50%; margin:0 auto 18px; position:relative;
+  border:3px solid var(--teal); background:var(--bg-void) center/cover no-repeat;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  font-family:'Rajdhani',sans-serif; font-weight:700; font-size:48px; color:var(--teal);
+  box-shadow:0 0 40px rgba(67,236,196,.25);
+}
+
+/* ---------- Skins grid ---------- */
+.skin-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin:12px 0 6px;}
+.skin-swatch{
+  aspect-ratio:1; border-radius:50%; cursor:pointer; border:3px solid transparent;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);
+}
+.skin-swatch.active{border-color:#fff; transform:scale(1.08);}
+
+/* ---------- Room / friend play ---------- */
+.room-code-display{
+  text-align:center; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:34px;
+  letter-spacing:6px; color:var(--gold); background:var(--bg-void); border:1px dashed var(--line);
+  border-radius:12px; padding:14px; margin:10px 0;
+}
+.room-players{list-style:none; margin:10px 0; padding:0; max-height:140px; overflow-y:auto;}
+.room-players li{padding:8px 10px; border-bottom:1px solid var(--line); font-size:14px; display:flex; justify-content:space-between;}
+
+/* ---------- Chat ---------- */
+#chatPanel{
+  position:absolute; left:calc(14px + var(--safe-left)); bottom:calc(14px + var(--safe-bottom));
+  width:240px; max-height:220px; display:flex; flex-direction:column; pointer-events:all;
+  background:rgba(10,14,23,.72); border:1px solid var(--line); border-radius:12px; backdrop-filter:blur(4px);
+  overflow:hidden;
+}
+#chatMessages{flex:1; overflow-y:auto; padding:8px 10px; font-size:12.5px; display:flex; flex-direction:column; gap:4px; max-height:150px;}
+#chatMessages b{color:var(--teal);}
+.chat-input-row{display:flex; border-top:1px solid var(--line);}
+#chatInput{
+  flex:1; background:transparent; border:none; color:var(--text-hi); padding:8px 10px; font-size:13px; outline:none;
+}
+#chatSendBtn{background:none; border:none; color:var(--teal); padding:0 12px; cursor:pointer; font-size:16px;}
+
+/* ---------- HUD ---------- */
+#hud{
+  position:fixed; inset:0; z-index:20; pointer-events:none;
+  padding: calc(14px + var(--safe-top)) calc(14px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(14px + var(--safe-left));
+}
+.hud-top{display:flex; justify-content:space-between; align-items:flex-start;}
+.hud-stats{
+  background:rgba(10,14,23,.65); border:1px solid var(--line); border-radius:12px;
+  padding:10px 16px; font-family:'Rajdhani',sans-serif; backdrop-filter:blur(4px);
+}
+.hud-stats .row{display:flex; gap:8px; align-items:baseline; font-size:14px; color:var(--text-lo);}
+.hud-stats .row b{color:var(--teal); font-size:18px; font-weight:700;}
+#shieldBadge{color:var(--gold); font-size:12px; margin-top:2px;}
+#fpsCounter{position:absolute; top:-2px; right:0; font-size:11px; color:var(--gold); font-family:'Rajdhani',sans-serif;}
+.hud-icon-btn{
+  pointer-events:all; width:46px; height:46px; border-radius:12px; border:1px solid var(--line);
+  background:rgba(10,14,23,.65); color:var(--text-hi); font-size:20px; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; backdrop-filter:blur(4px);
+}
+#leaderboardHud{
+  position:absolute; top:calc(14px + var(--safe-top)); right:calc(14px + var(--safe-right));
+  width:180px; background:rgba(10,14,23,.65); border:1px solid var(--line); border-radius:12px;
+  padding:10px 12px; backdrop-filter:blur(4px);
+}
+#leaderboardHud h3{margin:0 0 6px; font-family:'Rajdhani',sans-serif; font-size:13px; letter-spacing:1px; color:var(--gold); text-transform:uppercase;}
+#leaderboardHud ol{margin:0; padding-left:18px; font-size:12.5px; color:var(--text-lo);}
+#leaderboardHud li.me{color:var(--teal); font-weight:700;}
+.hud-corner-row{display:flex; gap:8px; margin-top:10px;}
+#minimapWrap{
+  position:absolute; bottom:calc(14px + var(--safe-bottom)); right:calc(14px + var(--safe-right));
+  width:120px; height:120px; border-radius:50%; border:2px solid var(--line);
+  background:rgba(10,14,23,.55); backdrop-filter:blur(3px);
+}
+#minimap{width:100%; height:100%; border-radius:50%;}
+
+/* ---------- Scoreboard overlay (TAB) ---------- */
+#scoreboardOverlay{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:min(300px,80vw); background:rgba(10,14,23,.85); border:1px solid var(--line); border-radius:14px;
+  padding:14px 16px; backdrop-filter:blur(6px);
+}
+#scoreboardOverlay h3{margin:0 0 8px; font-family:'Rajdhani',sans-serif; font-size:14px; letter-spacing:1px; color:var(--gold); text-transform:uppercase; text-align:center;}
+#scoreboardList{list-style:none; margin:0; padding:0; font-family:'Rajdhani',sans-serif; font-size:15px;}
+#scoreboardList li{display:flex; justify-content:space-between; padding:4px 2px; border-bottom:1px solid rgba(255,255,255,.05);}
+#scoreboardList li.me{color:var(--teal); font-weight:700;}
+
+/* ---------- Game over stat grid ---------- */
+.go-stats{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0 20px;}
+.go-stat{background:var(--bg-void); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center;}
+.go-stat .num{font-family:'Rajdhani',sans-serif; font-size:26px; font-weight:700; color:var(--teal);}
+.go-stat .lbl{font-size:11px; color:var(--text-lo); text-transform:uppercase; letter-spacing:1px; margin-top:2px;}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed; bottom:calc(24px + var(--safe-bottom)); left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--bg-panel-2); border:1px solid var(--teal-dim); color:var(--text-hi);
+  padding:10px 20px; border-radius:10px; font-size:14px; opacity:0; pointer-events:none; z-index:100;
+  transition:opacity .25s, transform .25s; text-align:center; max-width:88vw;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+/* ---------- Responsive tweaks ---------- */
+@media (max-width:480px){
+  .panel{padding:20px 16px;}
+  .btn{font-size:15px; padding:13px 14px; min-height:48px;}
+  #leaderboardHud{width:150px;}
+  #minimapWrap{width:90px; height:90px;}
+  #chatPanel{width:190px;}
+  .skin-grid{grid-template-columns:repeat(5,1fr); gap:8px;}
+}
+@media (min-width:1200px){
+  .panel{width:520px;}
+}
+::-webkit-scrollbar{width:8px;}
+::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- ================= HUD (in-game) ================= -->
+<div id="hud" class="hidden">
+  <div class="hud-top">
+    <div class="hud-stats">
+      <div class="row">Skor <b id="hudScore">0</b></div>
+      <div class="row">Boyut <b id="hudSize">0</b></div>
+      <div class="row">Süre <b id="hudTime">00:00</b></div>
+      <div id="shieldBadge" class="hidden">🛡 Korumalı</div>
+      <div id="fpsCounter" class="hidden">FPS: 60</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <div class="hud-icon-btn" id="btnMenuOpen">☰</div>
+    </div>
+  </div>
+  <div id="leaderboardHud">
+    <h3>🏆 Liderlik</h3>
+    <ol id="hudLeaderboardList"></ol>
+  </div>
+  <div id="minimapWrap"><canvas id="minimap"></canvas></div>
+  <div id="scoreboardOverlay" class="hidden">
+    <h3>Skor Tablosu (TAB)</h3>
+    <ol id="scoreboardList"></ol>
+  </div>
+  <div id="chatPanel" class="hidden">
+    <div id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input id="chatInput" maxlength="200" placeholder="Mesaj yaz…">
+      <button id="chatSendBtn">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Ana Menü ================= -->
+<div id="screenMainMenu" class="overlay">
+  <div class="panel">
+    <h1 class="title">🧫 MİKROP ARENA</h1>
+    <div class="subtitle">Hücre Savaşları</div>
+
+    <div class="profile-strip">
+      <div class="avatar-circle" id="miniAvatar">S</div>
+      <div class="who">
+        <div class="pname" id="miniName">Sen</div>
+        <div class="pstat" id="miniStat">En iyi: 0</div>
+      </div>
+    </div>
+
+    <label style="display:block; font-size:12px; color:var(--text-lo); font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:.5px; margin:2px 2px 6px;">Adınız</label>
+    <input id="playerNameInput" class="name-input" maxlength="16" placeholder="Adınızı girin...">
+
+    <div class="menu-grid">
+      <button class="menu-item primary" id="btnPlay"><span class="ico">▶️</span> Oyuna Başla</button>
+      <button class="menu-item" id="btnPlayFriend"><span class="ico">👥</span> Arkadaşınla Oyna</button>
+      <button class="menu-item" id="btnSettings"><span class="ico">⚙️</span> Ayarlar</button>
+      <button class="menu-item" id="btnProfile"><span class="ico">👤</span> Profil</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Arkadaşınla Oyna ================= -->
+<div id="screenPlayFriend" class="overlay hidden">
+  <div class="panel">
+    <div class="back-row"><div class="back-btn" data-close="screenPlayFriend">←</div><h2 class="panel-title" style="margin:0;">👥 Arkadaşınla Oyna</h2></div>
+
+    <button class="btn btn-primary" id="btnCreateRoom">➕ Özel Oda Oluştur</button>
+    <div id="roomCreatedBox" class="hidden">
+      <div class="room-code-display" id="roomCodeText">------</div>
+      <button class="btn btn-sm" id="btnCopyRoomCode" style="width:100%;">📋 Kodu Kopyala — Arkadaşını Davet Et</button>
+    </div>
+
+    <div style="margin:18px 0 8px; text-align:center; color:var(--text-lo); font-size:13px;">— veya bir kodla katıl —</div>
+    <input id="roomCodeInput" class="name-input" maxlength="6" placeholder="ODA KODU" style="text-transform:uppercase; letter-spacing:4px;">
+    <button class="btn" id="btnJoinRoom">🔑 Odaya Katıl</button>
+
+    <ul class="room-players hidden" id="roomPlayersList"></ul>
+    <button class="btn btn-primary hidden" id="btnStartRoomGame" style="margin-top:10px;">▶ Odada Oynamaya Başla</button>
+  </div>
+</div>
+
+<!-- ================= Profil ================= -->
+<div id="screenProfile" class="overlay hidden">
+  <div class="panel">
+    <div class="back-row"><div class="back-btn" data-close="screenProfile">←</div><h2 class="panel-title" style="margin:0;">👤 Profil</h2></div>
+    <div class="avatar-big" id="profileAvatarBig">S</div>
+    <label style="display:block; font-size:12px; color:var(--text-lo); font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:.5px; margin:2px 2px 6px;">Adınız</label>
+    <input id="profileNameInput" class="name-input" maxlength="16" placeholder="Adınızı girin...">
+    <div class="go-stats">
+      <div class="go-stat"><div class="num" id="statGames">0</div><div class="lbl">Oynanan Oyun</div></div>
+      <div class="go-stat"><div class="num" id="statBest">0</div><div class="lbl">En Yüksek Skor</div></div>
+      <div class="go-stat"><div class="num" id="statEaten">0</div><div class="lbl">Toplam Yenen</div></div>
+      <div class="go-stat"><div class="num" id="statColor">—</div><div class="lbl">Aktif Skin</div></div>
+    </div>
+    <button class="btn btn-primary" id="btnProfileSave">✔ Kaydet</button>
+    <div class="btn-row">
+      <button class="btn" id="btnAvatar">🖼 Avatar</button>
+      <button class="btn" id="btnSkins">🎨 Skinler</button>
+    </div>
+    <button class="btn" id="btnLeaderboard">🏆 Liderlik Tablosu</button>
+  </div>
+</div>
+
+<!-- ================= Avatar ================= -->
+<div id="screenAvatarPick" class="overlay hidden">
+  <div class="panel">
+    <div class="back-row"><div class="back-btn" data-close="screenAvatarPick">←</div><h2 class="panel-title" style="margin:0;">🖼 Avatar</h2></div>
+    <div class="avatar-big" id="avatarPreviewBig">S</div>
+    <input type="file" id="avatarFileInput" accept="image/*" class="hidden">
+    <button class="btn btn-primary" id="btnPickPhoto">📷 Galeriden Fotoğraf Seç</button>
+    <button class="btn" id="btnRemoveAvatar">🗑 Fotoğrafı Kaldır</button>
+    <div id="avatarStatus" style="text-align:center; font-size:12.5px; color:var(--text-lo); margin-top:6px;"></div>
+  </div>
+</div>
+
+<!-- ================= Skinler ================= -->
+<div id="screenSkins" class="overlay hidden">
+  <div class="panel">
+    <div class="back-row"><div class="back-btn" data-close="screenSkins">←</div><h2 class="panel-title" style="margin:0;">🎨 Skinler</h2></div>
+    <div class="skin-grid" id="skinGrid"></div>
+    <p style="text-align:center; color:var(--text-lo); font-size:12px; margin-top:10px;">Avatar fotoğrafın varsa hücrenin içinde o görünür; skin rengi çerçeve ve isimsiz alanlarda kullanılır.</p>
+  </div>
+</div>
+
+<!-- ================= Duraklatma Menüsü ================= -->
+<div id="screenPause" class="overlay hidden">
+  <div class="panel">
+    <h2 class="panel-title">⏸ Oyun Duraklatıldı</h2>
+    <button class="btn btn-primary" id="btnResume">▶ Devam Et</button>
+    <button class="btn" id="btnRestartFromPause">🔄 Yeniden Başlat</button>
+    <button class="btn" id="btnSettingsFromPause">⚙ Ayarlar</button>
+    <button class="btn" id="btnMainMenuFromPause">🏠 Ana Menü</button>
+    <button class="btn btn-danger" id="btnQuitFromPause">❌ Oyundan Çık</button>
+  </div>
+</div>
+
+<!-- ================= Ayarlar ================= -->
+<div id="screenSettings" class="overlay hidden">
+  <div class="panel">
+    <h2 class="panel-title">⚙️ Ayarlar</h2>
+
+    <div class="setting-row">
+      <span class="setting-label">Ses Seviyesi</span>
+      <input type="range" id="rangeSfx" min="0" max="100" value="70">
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Müzik Seviyesi</span>
+      <input type="range" id="rangeMusic" min="0" max="100" value="40">
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Ses Aç/Kapat</span>
+      <div class="toggle" id="toggleSound"></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Müzik Aç/Kapat</span>
+      <div class="toggle" id="toggleMusic"></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Titreşim<small>Yeme anında hafif titreşim</small></span>
+      <div class="toggle" id="toggleVibrate"></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Grafik Kalitesi<small>Performans / görsel denge</small></span>
+      <div class="seg" id="segQuality">
+        <button data-v="low">Düşük</button>
+        <button data-v="mid" class="active">Orta</button>
+        <button data-v="high">Yüksek</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">FPS Göster</span>
+      <div class="toggle" id="toggleFps"></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Minimap</span>
+      <div class="toggle" id="toggleMinimap"></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Tam Ekran</span>
+      <div class="toggle" id="toggleFullscreen"></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Tema Seçimi</span>
+      <div class="seg" id="segTheme">
+        <button data-v="abyss" class="active">Derin</button>
+        <button data-v="neon">Neon</button>
+        <button data-v="sunset">Gün Batımı</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <span class="setting-label">🤖 Bot Sayısı<small>Çevrimdışı, internetsiz çalışan yerel botlar</small></span>
+      <input type="number" id="botCountInput" min="0" max="24" value="6" style="width:64px; padding:8px; border-radius:8px; border:1px solid var(--line); background:var(--bg-void); color:var(--text-hi); text-align:center; font-family:'Rajdhani',sans-serif; font-weight:700;">
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">Botlar<small>Oyun kapanınca otomatik silinir</small></span>
+      <div class="btn-row" style="width:auto;">
+        <button class="btn btn-sm" id="btnAddBots">➕ Bot Ekle</button>
+        <button class="btn btn-sm btn-danger" id="btnClearBots">🗑 Temizle</button>
+      </div>
+    </div>
+
+    <button class="btn" id="btnHowTo">📖 Nasıl Oynanır</button>
+    <button class="btn btn-primary" id="btnSettingsClose" style="margin-top:10px;">✔ Kaydet ve Kapat</button>
+  </div>
+</div>
+
+<!-- ================= Nasıl Oynanır ================= -->
+<div id="screenHowTo" class="overlay hidden">
+  <div class="panel panel-wide">
+    <h2 class="panel-title">📖 Nasıl Oynanır</h2>
+    <div style="font-size:14.5px; line-height:1.7; color:var(--text-lo);">
+      <p><b style="color:var(--teal);">📱 Mobil:</b> Ekranın herhangi bir yerine dokunup sürükle — hücren o yöne gider. Parmağını çekince kısa süre akıcı şekilde devam edip yavaşlar.</p>
+      <p><b style="color:var(--teal);">🖱 Masaüstü:</b> Fareni takip eder, ya da WASD / ok tuşlarını kullan. <b>Shift</b> ile hızlan, <b>ESC</b> ile duraklat, <b>TAB</b> basılı tutarak skor tablosunu gör, <b>M</b> ile minimap'i aç/kapat.</p>
+      <p><b style="color:var(--teal);">🟢 Yiyecekler:</b> Küçük parlayan noktaları yiyerek büyü. Altın yıldızlar bonus kütle verir.</p>
+      <p><b style="color:var(--teal);">🔵 Diğer Hücreler:</b> Senden belirgin küçük hücreleri yiyebilirsin, senden büyüklerden kaç!</p>
+      <p><b style="color:var(--teal);">🛡 Yeni Doğanlar:</b> Az önce doğan oyuncular 10 saniye korumalı ve yarı saydamdır — bu sürede kimseyi yiyemez, kimse onları yiyemez.</p>
+      <p><b style="color:var(--teal);">☠ Zehir bölgesi</b> kütleni azaltır, <b style="color:var(--teal);">⚡ hız bölgesi</b> seni hızlandırır, <b style="color:var(--teal);">🌀 portallar</b> seni haritanın diğer ucuna ışınlar.</p>
+    </div>
+    <button class="btn btn-primary" id="btnHowToClose" style="margin-top:14px;">Anladım</button>
+  </div>
+</div>
+
+<!-- ================= Liderlik Tablosu ================= -->
+<div id="screenLeaderboard" class="overlay hidden">
+  <div class="panel">
+    <h2 class="panel-title">🏆 Liderlik Tablosu</h2>
+    <ol id="leaderboardFullList" style="font-family:'Rajdhani',sans-serif; font-size:16px; padding-left:24px; color:var(--text-hi);"></ol>
+    <button class="btn btn-primary" id="btnLeaderboardClose" style="margin-top:6px;">Kapat</button>
+  </div>
+</div>
+
+<!-- ================= Oyun Bitti ================= -->
+<div id="screenGameOver" class="overlay hidden">
+  <div class="panel">
+    <h2 class="panel-title">💀 Oyun Bitti</h2>
+    <div class="go-stats">
+      <div class="go-stat"><div class="num" id="goScore">0</div><div class="lbl">Skor</div></div>
+      <div class="go-stat"><div class="num" id="goMaxSize">0</div><div class="lbl">En Büyük Boyut</div></div>
+      <div class="go-stat"><div class="num" id="goTime">00:00</div><div class="lbl">Hayatta Kalma</div></div>
+      <div class="go-stat"><div class="num" id="goEaten">0</div><div class="lbl">Yediği Oyuncu</div></div>
+    </div>
+    <button class="btn btn-primary" id="btnPlayAgain">🔄 Tekrar Oyna</button>
+    <button class="btn" id="btnGoMainMenu">🏠 Ana Menü</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module" src="firebase-config.js"></script>
+<script type="module" src="main.js"></script>
+</body>
+</html>
