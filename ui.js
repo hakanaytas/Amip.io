@@ -192,7 +192,10 @@ export function bindStaticUI(hooks){
   bindToggle("toggleSound","soundOn");
   bindToggle("toggleMusic","musicOn", (on)=>{ if(on) SoundManager.startMusic(); else SoundManager.stopMusic(); });
   bindToggle("toggleVibrate","vibrateOn");
-  bindToggle("toggleMinimap","minimapOn", (on)=>{ $("minimapWrap") && $("minimapWrap").classList.toggle("hidden", !on); });
+  bindToggle("toggleMinimap","minimapOn", (on)=>{
+    $("minimapWrap") && $("minimapWrap").classList.toggle("hidden", !on);
+    hooks.onMinimapToggle && hooks.onMinimapToggle(on);
+  });
 
   safe(()=>{
     document.querySelectorAll("#segQuality button").forEach(btn=>{
@@ -202,6 +205,18 @@ export function bindStaticUI(hooks){
         btn.classList.add("active");
         SettingsManager.data.quality = btn.dataset.v; SettingsManager.save();
         hooks.onQualityChange && hooks.onQualityChange(btn.dataset.v);
+      };
+    });
+  });
+  safe(()=>{
+    document.querySelectorAll("#segMode button").forEach(btn=>{
+      if(btn.dataset.v === SettingsManager.data.mode) btn.classList.add("active");
+      btn.onclick = ()=>{
+        document.querySelectorAll("#segMode button").forEach(b=>b.classList.remove("active"));
+        btn.classList.add("active");
+        SettingsManager.data.mode = btn.dataset.v; SettingsManager.save();
+        SoundManager.click();
+        hooks.onModeChange && hooks.onModeChange(btn.dataset.v);
       };
     });
   });

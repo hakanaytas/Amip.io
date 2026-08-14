@@ -234,6 +234,7 @@ input[type=range]::-moz-range-thumb{
 .hud-stats .row{display:flex; gap:8px; align-items:baseline; font-size:14px; color:var(--text-lo);}
 .hud-stats .row b{color:var(--teal); font-size:18px; font-weight:700;}
 #shieldBadge{color:var(--gold); font-size:12px; margin-top:2px;}
+#snakeModeBadge{color:var(--teal); font-size:12px; margin-top:2px;}
 #fpsCounter{position:absolute; top:-2px; right:0; font-size:11px; color:var(--gold); font-family:'Rajdhani',sans-serif;}
 .hud-icon-btn{
   pointer-events:all; width:46px; height:46px; border-radius:12px; border:1px solid var(--line);
@@ -310,6 +311,7 @@ input[type=range]::-moz-range-thumb{
       <div class="row">Boyut <b id="hudSize">0</b></div>
       <div class="row">Süre <b id="hudTime">00:00</b></div>
       <div id="shieldBadge" class="hidden">🛡 Korumalı</div>
+      <div id="snakeModeBadge" class="hidden">🐍 Yılan Modu</div>
       <div id="fpsCounter" class="hidden">FPS: 60</div>
     </div>
     <div style="display:flex; gap:8px;">
@@ -459,6 +461,13 @@ input[type=range]::-moz-range-thumb{
     <div class="setting-row">
       <span class="setting-label">Titreşim<small>Yeme anında hafif titreşim</small></span>
       <div class="toggle" id="toggleVibrate"></div>
+    </div>
+    <div class="setting-row">
+      <span class="setting-label">🐍 Oyun Modu<small>Yılan modunda kafanı bir gövdeye çarparsan ölürsün</small></span>
+      <div class="seg" id="segMode">
+        <button data-v="classic" class="active">Klasik</button>
+        <button data-v="snake">Yılan</button>
+      </div>
     </div>
     <div class="setting-row">
       <span class="setting-label">Grafik Kalitesi<small>Performans / görsel denge</small></span>

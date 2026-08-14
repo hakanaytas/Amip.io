@@ -48,6 +48,30 @@ function fitFontSize(ctx, text, maxWidth, startPx){
   return size;
 }
 
+/* Yılan Modu: kafanın arkasında sıralanan, kuyruğa doğru incelen gövde
+   parçalarını çizer. drawBlob'dan ÖNCE çağrılmalı (kafa en üstte kalsın). */
+export function drawSnakeBody(ctx, b, zoom){
+  const trail = b.trail;
+  if(!trail || trail.length < 2) return;
+  const n = trail.length;
+  ctx.save();
+  ctx.globalAlpha = b.invulnerable ? 0.45 : 0.92;
+  ctx.fillStyle = b.color;
+  ctx.strokeStyle = "rgba(0,0,0,0.18)";
+  ctx.lineWidth = 1.2/zoom;
+  for(let i=n-1;i>=0;i--){
+    const p = trail[i];
+    const t = i/n; // 0 kafaya yakın, 1 kuyruk ucu
+    const rad = Math.max(b.r*0.22, b.r*0.62*(1 - t*0.6));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, rad, 0, Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 export function drawBlob(ctx, b, zoom, quality, now, isSelf){
   const punch = b.scalePunch || 1;
   const r = b.r * punch;

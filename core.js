@@ -20,6 +20,12 @@ export const FOOD_TARGET_BASE = { low: 260, mid: 480, high: 760 };
 export const OBSTACLE_COUNT = { low: 26, mid: 42, high: 60 };
 export const PLANT_COUNT = { low: 40, mid: 70, high: 110 };
 
+/* ---- Yılan Modu (Snake Mode) ---- */
+export const SNAKE_MIN_SEGMENTS = 8;
+export const SNAKE_MAX_SEGMENTS = 90;
+export const SNAKE_SEG_SPACING_MIN = 7;
+export const SNAKE_SEG_SPACING_MAX = 20;
+
 export const THEMES = {
   abyss:  { bg:"#070a12", grid:"rgba(67,236,196,0.06)", accent:"#43ecc4" },
   neon:   { bg:"#05060f", grid:"rgba(255,79,129,0.08)", accent:"#ff4f81" },
@@ -60,6 +66,7 @@ export const SettingsManager = {
     soundOn: true, musicOn: true, vibrateOn: true,
     minimapOn: true,
     botCount: 6,
+    mode: "classic", // "classic" | "snake" — oyun modu
   },
   load(){
     try{

@@ -5,7 +5,8 @@
 import {
   WORLD_SIZE, BASE_RADIUS, FOOD_RADIUS, FOOD_MASS, BONUS_FOOD_MASS,
   radiusForMass, rand, randInt, SHIELD_DURATION, FOOD_TARGET_BASE,
-  OBSTACLE_COUNT, PLANT_COUNT, dist,
+  OBSTACLE_COUNT, PLANT_COUNT, dist, clamp,
+  SNAKE_MIN_SEGMENTS, SNAKE_MAX_SEGMENTS, SNAKE_SEG_SPACING_MIN, SNAKE_SEG_SPACING_MAX,
 } from "./core.js";
 
 /* ---------------- Hücre (yerel oyuncu ya da referans) ---------------- */
@@ -20,6 +21,7 @@ export class Blob{
     this.glow = 0; // parlama efekti gücü (0..1)
     this.deathT = 0; // ölüm animasyonu ilerleme süresi
     this.avatarImg = null;
+    this.trail = []; // Yılan Modu: baştan kuyruğa geçmiş konum noktaları
     this._loadAvatar();
   }
   _loadAvatar(){
@@ -46,6 +48,29 @@ export class Blob{
     if(this.shieldTime > 0) this.shieldTime = Math.max(0, this.shieldTime - dt);
     if(this.scalePunch > 1) this.scalePunch = Math.max(1, this.scalePunch - dt*1.6);
     if(this.glow > 0) this.glow = Math.max(0, this.glow - dt*1.4);
+  }
+
+  /* ---- Yılan Modu yardımcıları ---- */
+  _segSpacing(){
+    return clamp(this.r*0.42, SNAKE_SEG_SPACING_MIN, SNAKE_SEG_SPACING_MAX);
+  }
+  snakeLength(){
+    return clamp(Math.round(this.mass/3.2), SNAKE_MIN_SEGMENTS, SNAKE_MAX_SEGMENTS);
+  }
+  /* active=true iken her karede kafa konumunu iz olarak biriktirir; yeterince
+     hareket edilmediyse yeni nokta eklemez (eşit aralıklı gövde parçaları). */
+  updateTrail(active){
+    if(!active){
+      if(this.trail.length) this.trail.length = 0;
+      return;
+    }
+    const spacing = this._segSpacing();
+    const head = this.trail[0];
+    if(!head || dist(this.x,this.y,head.x,head.y) >= spacing){
+      this.trail.unshift({ x:this.x, y:this.y });
+      const maxLen = this.snakeLength();
+      if(this.trail.length > maxLen) this.trail.length = maxLen;
+    }
   }
 }
 

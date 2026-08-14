@@ -114,11 +114,12 @@ export class BotManager{
     return best;
   }
 
-  update(dt, world, player){
+  update(dt, world, player, snakeMode=false){
     const livingPlayer = (player && !player._dead) ? player : null;
 
     for(const bot of this.bots){
       bot.tick(dt);
+      bot.updateTrail(snakeMode);
       bot.thinkTimer -= dt;
       if(bot.thinkTimer <= 0){
         bot.thinkTimer = 0.22 + Math.random()*0.16;
