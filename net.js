@@ -23,8 +23,14 @@ export const LeaderboardManager = {
     }
     return this._local().slice(0,n);
   },
+  // Çevrimdışı (Firebase'siz) yerel liste de aynı şekilde son 1 saatlik
+  // pencereye göre filtrelenir, böylece davranış tutarlı olur.
   _local(){
-    try{ return JSON.parse(localStorage.getItem(this.key) || "[]"); }catch(e){ return []; }
+    try{
+      const cutoff = Date.now() - 60*60*1000;
+      const list = JSON.parse(localStorage.getItem(this.key) || "[]");
+      return list.filter(e => !e.ts || e.ts > cutoff).sort((a,b)=>b.score-a.score);
+    }catch(e){ return []; }
   }
 };
 

@@ -68,18 +68,30 @@ export function buildSkinGrid(onPick){
   });
 }
 
-export async function openLeaderboard(){
+export async function openLeaderboard(liveNames=[]){
   const list = await LeaderboardManager.top(10);
   const el = $("leaderboardFullList");
   el.innerHTML = list.length
     ? list.map(e=>`<li>${escapeHtml(e.name)} — <b style="color:var(--teal)">${e.score}</b></li>`).join("")
-    : `<li style="color:var(--text-lo)">Henüz skor yok. İlk sen ol!</li>`;
+    : `<li style="color:var(--text-lo)">Bu saatte henüz skor yok. İlk sen ol!</li>`;
+  const liveEl = $("leaderboardLiveList");
+  if(liveEl){
+    liveEl.innerHTML = liveNames.length
+      ? liveNames.map(n=>`<li>${escapeHtml(n)}</li>`).join("")
+      : `<li style="color:var(--text-lo)">Şu an başka bağlı oyuncu yok</li>`;
+  }
   show("screenLeaderboard");
 }
-export async function refreshHudLeaderboard(){
+export async function refreshHudLeaderboard(liveNames=[]){
   const list = await LeaderboardManager.top(5);
   const el = $("hudLeaderboardList");
   if(el) el.innerHTML = list.length ? list.map(e=>`<li>${escapeHtml(e.name)} — ${e.score}</li>`).join("") : "<li>—</li>";
+  const liveEl = $("hudLiveList");
+  if(liveEl){
+    liveEl.innerHTML = liveNames.length
+      ? liveNames.slice(0,8).map(n=>`<li>${escapeHtml(n)}</li>`).join("")
+      : `<li style="color:var(--text-lo)">—</li>`;
+  }
 }
 
 /* Bir elementi güvenle bulup event bağlar; element yoksa sessizce uyarı
@@ -115,7 +127,7 @@ export function bindStaticUI(hooks){
 
   on("btnHowTo","click", ()=>{ SoundManager.click(); show("screenHowTo"); });
   on("btnHowToClose","click", ()=>{ SoundManager.click(); hide("screenHowTo"); });
-  on("btnLeaderboard","click", ()=>{ SoundManager.click(); openLeaderboard(); });
+  on("btnLeaderboard","click", ()=>{ SoundManager.click(); openLeaderboard(hooks.getLiveNames ? hooks.getLiveNames() : []); });
   on("btnLeaderboardClose","click", ()=>{ SoundManager.click(); hide("screenLeaderboard"); });
 
   on("btnProfile","click", ()=>{ SoundManager.click(); refreshProfileUI(); show("screenProfile"); });

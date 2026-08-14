@@ -25,7 +25,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/fireba
 import { getAnalytics, isSupported as analyticsIsSupported } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics.js";
 import {
   getFirestore, collection, addDoc, doc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, query, orderBy, limit, getDocs, serverTimestamp
+  onSnapshot, query, orderBy, limit, getDocs, serverTimestamp, where
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import {
   getStorage, ref, uploadBytes, getDownloadURL
@@ -73,10 +73,23 @@ window.FirebaseBridge = {
       ts: serverTimestamp(),
     });
   },
+  // "Liderlik tablosu" artık kalıcı/sonsuz değil — her zaman yalnızca SON 1
+  // SAATTİR gönderilen skorları gösterir (rolling window). Eski kayıtlar
+  // Firestore kurallarında silinemez olduğundan fiilen silinmiyor, sadece
+  // bu sorgu tarafından görmezden geliniyor; böylece tablo saatlik olarak
+  // kendiliğinden "sıfırlanmış" gibi davranır.
   async getTopScores(n = 10) {
-    const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(n));
+    const cutoff = new Date(Date.now() - 60 * 60 * 1000);
+    const q = query(
+      collection(db, "leaderboard"),
+      where("ts", ">", cutoff),
+      orderBy("ts", "desc"),
+      limit(200)
+    );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => d.data());
+    const rows = snap.docs.map((d) => d.data());
+    rows.sort((a, b) => (b.score || 0) - (a.score || 0));
+    return rows.slice(0, n);
   },
 
   // --- Canlı arena: gerçek, o an bağlı oyuncular (bot YOK) ---

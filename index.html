@@ -319,8 +319,10 @@ input[type=range]::-moz-range-thumb{
     </div>
   </div>
   <div id="leaderboardHud">
-    <h3>🏆 Liderlik</h3>
+    <h3>🏆 Liderlik <small style="font-weight:400; text-transform:none; letter-spacing:0;">(saatlik)</small></h3>
     <ol id="hudLeaderboardList"></ol>
+    <h3 style="margin-top:8px;">🟢 Şu An Çevrimiçi</h3>
+    <ol id="hudLiveList"><li style="color:var(--text-lo);">—</li></ol>
   </div>
   <div id="minimapWrap"><canvas id="minimap"></canvas></div>
   <div id="scoreboardOverlay" class="hidden">
@@ -535,7 +537,10 @@ input[type=range]::-moz-range-thumb{
 <div id="screenLeaderboard" class="overlay hidden">
   <div class="panel">
     <h2 class="panel-title">🏆 Liderlik Tablosu</h2>
+    <p style="color:var(--text-lo); font-size:12.5px; margin:-6px 0 10px;">Tablo her saat başı kendiliğinden yenilenir — yalnızca son 1 saatte yapılan skorlar gösterilir.</p>
     <ol id="leaderboardFullList" style="font-family:'Rajdhani',sans-serif; font-size:16px; padding-left:24px; color:var(--text-hi);"></ol>
+    <h3 style="margin:14px 0 4px; font-family:'Rajdhani',sans-serif; font-size:13px; letter-spacing:1px; color:var(--teal); text-transform:uppercase;">🟢 Şu An Çevrimiçi Olanlar</h3>
+    <ol id="leaderboardLiveList" style="font-family:'Rajdhani',sans-serif; font-size:14px; padding-left:24px; color:var(--text-lo);"></ol>
     <button class="btn btn-primary" id="btnLeaderboardClose" style="margin-top:6px;">Kapat</button>
   </div>
 </div>

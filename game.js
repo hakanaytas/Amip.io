@@ -3,7 +3,7 @@
    ========================================================================= */
 import {
   WORLD_SIZE, BASE_RADIUS, FOOD_MASS, BONUS_FOOD_MASS, MAX_SPEED,
-  BOOST_MULT, BOOST_COST_PER_SEC, EAT_RATIO, MP_WRITE_INTERVAL,
+  BOOST_MULT, BOOST_COST_PER_SEC, EAT_RATIO, MP_WRITE_INTERVAL, SPEED_LERP_RATE,
   clamp, lerp, dist2, rand, fmtTime, radiusForMass, speedForRadius,
   THEMES, SettingsManager, ProfileManager, SoundManager,
 } from "./core.js";
@@ -65,7 +65,7 @@ export class Game{
 
     this._loop = this._loop.bind(this);
     requestAnimationFrame(this._loop);
-    refreshHudLeaderboard().catch(()=>{});
+    refreshHudLeaderboard(this._liveNames()).catch(()=>{});
   }
 
   /* En kritik, hep çalışması gereken butonlar. bindStaticUI'dan bağımsızdır. */
@@ -121,7 +121,16 @@ export class Game{
       onQuit: ()=> this._quit(),
       onAddBots: ()=> this._onAddBots(),
       onClearBots: ()=> this._onClearBots(),
+      getLiveNames: ()=> this._liveNames(),
     });
+  }
+
+  /* Şu an Firestore'a bağlı, gerçekten oturum açmış (bot olmayan) oyuncuların
+     isim listesi — liderlik panellerinde "Şu An Çevrimiçi" bölümü için. */
+  _liveNames(){
+    const names = [];
+    for(const rp of this.net.remotePlayers.values()){ if(rp && rp.name) names.push(rp.name); }
+    return [...new Set(names)];
   }
 
   /* ---------------- Bot sistemi (tamamen yerel, Firebase'siz) ---------------- */
@@ -257,6 +266,7 @@ export class Game{
       this._eatCooldown.clear();
       this._snakeMode = SettingsManager.data.mode === "snake";
       $("snakeModeBadge")?.classList.toggle("hidden", !this._snakeMode);
+      this._curSpeed = null;
 
       this.world.reseedFood();
       const spawn = this.world.findSafeSpawn(this.net.remotePlayers);
@@ -318,7 +328,7 @@ export class Game{
     $("snakeModeBadge")?.classList.add("hidden");
     show("screenMainMenu");
     refreshProfileUI();
-    refreshHudLeaderboard().catch(()=>{});
+    refreshHudLeaderboard(this._liveNames()).catch(()=>{});
   }
 
   async gameOver(eatenByName){
@@ -346,7 +356,7 @@ export class Game{
     const heading = $("screenGameOver")?.querySelector(".panel-title");
     if(heading) heading.textContent = (typeof eatenByName === "string" && eatenByName) ? `💀 ${eatenByName} Seni Yedi!` : "💀 Oyun Bitti";
     show("screenGameOver");
-    refreshHudLeaderboard().catch(()=>{});
+    refreshHudLeaderboard(this._liveNames()).catch(()=>{});
   }
 
   /* ---------------- Güncelleme ---------------- */
@@ -359,12 +369,16 @@ export class Game{
 
     // Hareket
     const mv = this.input.getMoveVector(dt);
-    let spd = speedForRadius(this.player.r) * this.world.speedMultiplierAt(this.player.x, this.player.y);
+    let targetSpd = speedForRadius(this.player.r) * this.world.speedMultiplierAt(this.player.x, this.player.y);
     if(this.input.isBoosting && this.player.mass > 40){
-      spd *= BOOST_MULT;
+      targetSpd *= BOOST_MULT;
       this.player.mass = Math.max(30, this.player.mass - BOOST_COST_PER_SEC*dt);
       this.player.updateRadius();
     }
+    // Hız aniden sıçramak yerine akıcı şekilde hedefe yaklaşır — böylece
+    // boost'a basınca "bir tık" hızlanma hissi olur, ani zıplama olmaz.
+    this._curSpeed = (this._curSpeed==null) ? targetSpd : lerp(this._curSpeed, targetSpd, clamp(dt*SPEED_LERP_RATE,0,1));
+    const spd = this._curSpeed;
     this.player.x = clamp(this.player.x + mv.x*spd*dt, this.player.r, WORLD_SIZE-this.player.r);
     this.player.y = clamp(this.player.y + mv.y*spd*dt, this.player.r, WORLD_SIZE-this.player.r);
 
@@ -489,26 +503,37 @@ export class Game{
     $("hudTime").textContent = fmtTime(this.elapsed);
     $("shieldBadge").classList.toggle("hidden", !this.player.invulnerable);
     if($("scoreboardOverlay").classList.contains("hidden")===false) this._updateScoreboard();
+
+    // "Şu an çevrimiçi" listesini oyun sırasında da tazele (skor tablosunu
+    // her seferinde Firestore'dan çekmeye gerek yok, sadece isim listesi)
+    this._liveListTimer = (this._liveListTimer||0) + dt;
+    if(this._liveListTimer > 2.5){
+      this._liveListTimer = 0;
+      const liveEl = $("hudLiveList");
+      if(liveEl){
+        const names = this._liveNames();
+        liveEl.innerHTML = names.length
+          ? names.slice(0,8).map(n=>`<li>${escapeHtml(n)}</li>`).join("")
+          : `<li style="color:var(--text-lo)">—</li>`;
+      }
+    }
   }
 
   /* ---------------- Yılan Modu çarpışmaları ----------------
-     Klasik yılan kuralı: bir kafanın, kendisininki dahil herhangi bir
-     gövdeye değmesi ölümle sonuçlanır. Kafa-kafaya temas ise klasik
-     kütle kuralına (büyük küçüğü yer) tabidir — bu zaten yukarıda
-     ayrıca işleniyor. Uzak (gerçek) oyuncuların iz verisi elimizde
-     olmadığından bu kontrol yalnızca yerel oyuncu ve botlar arasında
-     çalışır. */
-  _snakeBodyHit(hx, hy, hr, owner, skipOwnHead=false){
+     Klasik yılan kuralı: kafan BAŞKA bir yılanın gövdesine değerse
+     ölürsün. NOT: kendi kuyruğuna çarpma öldürmez — kısa gövdeli veya
+     hızlı dönüş yapan yılanlar (özellikle botlar) aksi halde sürekli
+     "kendi kendine" ölüyormuş gibi görünüyordu; bu kafa karıştırıcıydı,
+     bu yüzden bilinçli olarak kaldırıldı. Kafa-kafaya temas ise klasik
+     kütle kuralına (büyük küçüğü yer) tabidir — bu zaten yukarıda ayrıca
+     işleniyor. Uzak (gerçek) oyuncuların iz verisi elimizde olmadığından
+     bu kontrol yalnızca yerel oyuncu ve botlar arasında çalışır. */
+  _snakeBodyHit(hx, hy, hr, owner){
     const trail = owner.trail;
-    if(!trail || trail.length < 4) return false;
-    const bodyR = owner.r*0.5;
-    const rr = hr*0.6 + bodyR;
-    let skip = 0;
-    if(skipOwnHead){
-      const spacing = owner._segSpacing();
-      skip = Math.min(trail.length, Math.ceil((hr*1.4)/spacing) + 3);
-    }
-    for(let i=skip;i<trail.length;i++){
+    if(!trail || trail.length < 6) return false;
+    const bodyR = owner.r*0.42;
+    const rr = hr*0.5 + bodyR*0.75;
+    for(let i=0;i<trail.length;i++){
       const p = trail[i];
       if(dist2(hx,hy,p.x,p.y) < rr*rr) return true;
     }
@@ -516,12 +541,9 @@ export class Game{
   }
 
   _updateSnakeCollisions(){
-    // Oyuncunun kafası: kendi kuyruğuna veya bir bota çarptıysa oyun biter
+    // Oyuncunun kafası: bir botun gövdesine çarptıysa oyun biter
+    // (kendi kuyruğu artık ölümcül değil — bkz. yukarıdaki not)
     if(!this.player.invulnerable){
-      if(this._snakeBodyHit(this.player.x,this.player.y,this.player.r, this.player, true)){
-        this.gameOver("Kendi Kuyruğun");
-        return;
-      }
       for(const bot of this.botManager.bots){
         if(this._snakeBodyHit(this.player.x,this.player.y,this.player.r, bot)){
           this.gameOver(bot.name);
@@ -530,8 +552,7 @@ export class Game{
       }
     }
 
-    // Botların kafası: oyuncuya, başka bir bota ya da kendi kuyruğuna
-    // çarparsa o bot elenir
+    // Botların kafası: oyuncuya veya başka bir bota çarparsa o bot elenir
     for(let i=this.botManager.bots.length-1;i>=0;i--){
       const bot = this.botManager.bots[i];
       if(!bot || bot.invulnerable) continue;
@@ -543,7 +564,6 @@ export class Game{
           if(this._snakeBodyHit(bot.x,bot.y,bot.r, other)){ died = true; break; }
         }
       }
-      if(!died && this._snakeBodyHit(bot.x,bot.y,bot.r, bot, true)) died = true;
       if(died){
         this.particles.burst(bot.x,bot.y,bot.color,16,1.1);
         SoundManager.eatBig();
