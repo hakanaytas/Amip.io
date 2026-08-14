@@ -243,6 +243,7 @@ export class Game{
       const spawn = this.world.findSafeSpawn(this.net.remotePlayers);
       this.player = new Blob(spawn.x, spawn.y, 60, ProfileManager.data.color, this.playerName, ProfileManager.data.avatarUrl);
       this.camera.x = this.player.x; this.camera.y = this.player.y; this.camera.zoom = 1.15;
+      this.input.resetHeading(); // doğuşta rastgele bir yönde hareket etmeye başlar
 
       // Botlar: her yeni oyunda sıfırdan, tamamen yerel — internet gerekmez
       this.botManager.clear();
@@ -339,7 +340,7 @@ export class Game{
     // Hareket
     const mv = this.input.getMoveVector(dt);
     let spd = speedForRadius(this.player.r) * this.world.speedMultiplierAt(this.player.x, this.player.y);
-    if(this.input.isBoosting && this.player.mass > 40 && !this.input.isTouch){
+    if(this.input.isBoosting && this.player.mass > 40){
       spd *= BOOST_MULT;
       this.player.mass = Math.max(30, this.player.mass - BOOST_COST_PER_SEC*dt);
       this.player.updateRadius();
